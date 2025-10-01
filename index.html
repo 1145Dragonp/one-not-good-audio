@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>音频一键全损</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <style>
+    :root {
+      --bg: #f2f4f8;
+      --card: #ffffffcc;
+      --text: #333;
+      --accent: #0077ff;
+      --glass: blur(12px);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121212;
+        --card: #1e1e1ecc;
+        --text: #eaeaea;
+        --accent: #0a84ff;
+      }
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card);
+      backdrop-filter: var(--glass);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    h2 {
+      margin: 0 0 20px;
+      font-size: 22px;
+      text-align: center;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    label {
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    select {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      background: #fff;
+      color: #000;
+      font-size: 14px;
+    }
+    @media (prefers-color-scheme: dark) {
+      select {
+        background: #2a2a2a;
+        color: #fff;
+        border-color: #444;
+      }
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: .2s;
+    }
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+    .primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .primary:active {
+      transform: scale(.97);
+    }
+    .secondary {
+      background: #e0e0e0;
+      color: #000;
+    }
+    @media (prefers-color-scheme: dark) {
+      .secondary {
+        background: #3a3a3a;
+        color: #fff;
+      }
+    }
+    .progress-box {
+      margin-top: 20px;
+    }
+    .progress {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #e0e0e0;
+    }
+    @media (prefers-color-scheme: dark) {
+      .progress {
+        background: #3a3a3a;
+      }
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width .3s;
+    }
+    .status {
+      font-size: 13px;
+      margin-top: 8px;
+      text-align: center;
+    }
+    audio {
+      width: 100%;
+      margin-top: 20px;
+      border-radius: 8px;
+    }
+
+    /* ===== 美化文件选择 ===== */
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    /* 把原生 input 藏起来 */
+    #u {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    /* 伪装成按钮的 label */
+    .file-label {
+      flex-shrink: 0;
+      padding: 8px 16px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: .2s;
+      user-select: none;
+    }
+    .file-label:hover {
+      opacity: .9;
+    }
+    .file-label:active {
+      transform: scale(.97);
+    }
+    /* 文件名展示 */
+    .file-name {
+      flex: 1;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+      opacity: .7;
+    }
+
+    /* ===== 文件名修改弹窗样式 ===== */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      backdrop-filter: blur(5px);
+    }
+
+    .modal-content {
+      background-color: var(--card);
+      margin: 15% auto;
+      padding: 20px;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      animation: modalFadeIn 0.3s;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: translateY(-50px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .modal-header {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    .modal-input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 16px;
+      margin-bottom: 20px;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .modal-input {
+        background: #2a2a2a;
+        border-color: #444;
+      }
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .modal-buttons button {
+      flex: 1;
+    }
+
+    .modal-cancel {
+      background: #e0e0e0;
+      color: #000;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .modal-cancel {
+        background: #3a3a3a;
+        color: #fff;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>音频一键全损</h2>
+
+    <!-- 美化后的文件选择 -->
+    <div class="row file-row">
+      <label for="u" class="file-label">选择文件</label>
+      <input type="file" id="u" accept="audio/*">
+      <span class="file-name" id="fileName">未选择文件</span>
+    </div>
+
+    <!-- 失真强度滑块 -->
+    <div class="row">
+      <label>失真强度</label>
+      <input type="range" id="amtRange" min="5" max="50" value="20" step="1">
+      <span id="amtVal">20</span>
+    </div>
+
+    <div class="row">
+      <label>输出格式</label>
+      <select id="fmtSel">
+        <option value="mp3">MP3 (体积小,最慢)</option>
+        
+        <option value="wav" selected>WAV（无损,最快,体积大）</option>
+      </select>
+    </div>
+
+    <button id="renderBtn" class="primary" disabled>一键全损</button>
+    <button id="downloadBtn" class="secondary" disabled>下载文件</button>
+
+    <div class="progress-box">
+      <div class="progress">
+        <div class="progress-bar" id="progBar"></div>
+      </div>
+      <div class="status" id="status">等待选择文件…</div>
+    </div>
+
+    <audio id="player" controls style="display:none;"></audio>
+  </div>
+
+  <!-- 文件名修改弹窗 -->
+  <div id="filenameModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">修改文件名</div>
+      <input type="text" id="filenameInput" class="modal-input" placeholder="请输入文件名">
+      <div class="modal-buttons">
+        <button id="confirmDownload" class="primary">确认下载</button>
+        <button id="cancelDownload" class="modal-cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编码库 -->
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+  <script>
+    /* ================= 工具 ================= */
+    const u = document.getElementById('u');
+    const fmtSel = document.getElementById('fmtSel');
+    const renderBtn = document.getElementById('renderBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const status = document.getElementById('status');
+    const progBar = document.getElementById('progBar');
+    const player = document.getElementById('player');
+    const fileName = document.getElementById('fileName');
+
+    // 文件名修改弹窗元素
+    const filenameModal = document.getElementById('filenameModal');
+    const filenameInput = document.getElementById('filenameInput');
+    const confirmDownload = document.getElementById('confirmDownload');
+    const cancelDownload = document.getElementById('cancelDownload');
+
+    function setStat(txt, percent = 0) {
+      status.textContent = txt;
+      progBar.style.width = percent + '%';
+    }
+
+    function bufToWav(buffer) {
+      const len = buffer.length, nCh = buffer.numberOfChannels, rate = buffer.sampleRate;
+      const arr = new ArrayBuffer(44 + len * nCh * 2);
+      const view = new DataView(arr);
+      let pos = 0;
+      const setUint32 = d => { view.setUint32(pos, d, true); pos += 4; };
+      const setUint16 = d => { view.setUint16(pos, d, true); pos += 2; };
+      const setInt16 = d => { view.setInt16(pos, d, true); pos += 2; };
+      setUint32(0x46464952);
+      setUint32(36 + len * nCh * 2);
+      setUint32(0x45564157);
+      setUint32(0x20746d66); setUint32(16);
+      setUint16(1); setUint16(nCh);
+      setUint32(rate); setUint32(rate * nCh * 2);
+      setUint16(nCh * 2); setUint16(16);
+      setUint32(0x61746164); setUint32(len * nCh * 2);
+      for (let i = 0; i < len; i++) {
+        for (let ch = 0; ch < nCh; ch++) {
+          let s = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
+          setInt16(s < 0 ? s * 0x8000 : s * 0x7FFF);
+        }
+      }
+      return new Blob([arr], { type: 'audio/wav' });
+    }
+
+    async function bufToMp3(buffer, onProgress) {
+      const nCh = buffer.numberOfChannels, rate = buffer.sampleRate, len = buffer.length;
+      const enc = new lamejs.Mp3Encoder(nCh, rate, 128);
+      const block = 1152, total = Math.ceil(len / block);
+      let idx = 0, blocks = [];
+      const left = new Int16Array(len);
+      const right = nCh > 1 ? new Int16Array(len) : null;
+      for (let i = 0; i < len; i++) {
+        left[i] = buffer.getChannelData(0)[i] * 0x7FFF;
+        if (right) right[i] = buffer.getChannelData(1)[i] * 0x7FFF;
+      }
+      return new Promise(res => {
+        function next() {
+          if (idx >= total) {
+            const tail = enc.flush(); if (tail.length) blocks.push(tail);
+            const totalLen = blocks.reduce((a, b) => a + b.length, 0);
+            const result = new Uint8Array(totalLen);
+            let pos = 0; blocks.forEach(b => { result.set(b, pos); pos += b.length; });
+            res(new Blob([result], { type: 'audio/mp3' })); return;
+          }
+          const s = idx * block, e = Math.min(s + block, len);
+          const chk = right
+            ? enc.encodeBuffer(left.subarray(s, e), right.subarray(s, e))
+            : enc.encodeBuffer(left.subarray(s, e));
+          if (chk.length) blocks.push(chk);
+          idx++; onProgress(idx / total * 100);
+          setTimeout(next, 0);
+        }
+        next();
+      });
+    }
+
+    /* ================= 失真强度滑块联动 ================= */
+    const amtRange = document.getElementById('amtRange');
+    const amtVal   = document.getElementById('amtVal');
+    function updateAmt() {
+      const v = amtRange.value;
+      amtVal.textContent = v;
+      window.amt = Number(v);
+    }
+    amtRange.oninput = updateAmt;
+    updateAmt();
+
+    /* 文件名回显 */
+    u.addEventListener('change', e => {
+      const name = e.target.files[0]?.name || '未选择文件';
+      fileName.textContent = name;
+    });
+
+    /* ================= 文件名修改弹窗功能 ================= */
+    function showFilenameModal(defaultName) {
+      filenameInput.value = defaultName;
+      filenameModal.style.display = 'block';
+      filenameInput.focus();
+      filenameInput.select();
+    }
+
+    function hideFilenameModal() {
+      filenameModal.style.display = 'none';
+    }
+
+    // 点击取消按钮
+    cancelDownload.onclick = hideFilenameModal;
+
+    // 点击确认下载按钮
+    confirmDownload.onclick = () => {
+      const customFilename = filenameInput.value.trim();
+      if (customFilename) {
+        hideFilenameModal();
+        performDownload(customFilename);
+      }
+    };
+
+    // 点击模态框外部关闭
+    window.onclick = (event) => {
+      if (event.target === filenameModal) {
+        hideFilenameModal();
+      }
+    };
+
+    // ESC键关闭模态框
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && filenameModal.style.display === 'block') {
+        hideFilenameModal();
+      }
+    });
+
+    // 回车键确认下载
+    filenameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        confirmDownload.click();
+      }
+    });
+
+    /* ================= 主流程 ================= */
+    let originalBuffer = null, outBlob = null, outExt = 'mp3';
+
+    u.onchange = async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setStat('解码中…', 0);
+      renderBtn.disabled = true; downloadBtn.disabled = true; outBlob = null;
+      const arr = await file.arrayBuffer();
+      const tmp = new AudioContext();
+      originalBuffer = await tmp.decodeAudioData(arr);
+      tmp.close();
+      setStat('解码完成，可以开始处理', 0);
+      renderBtn.disabled = false;
+    };
+
+    renderBtn.onclick = async () => {
+      if (!originalBuffer) return;
+      renderBtn.disabled = true;
+      setStat('处理中…', 0);
+      outExt = fmtSel.value;
+
+      /* 1. 离线渲染 */
+      const off = new OfflineAudioContext(originalBuffer.numberOfChannels,
+                                         originalBuffer.length,
+                                         originalBuffer.sampleRate);
+      const src = off.createBufferSource();
+      src.buffer = originalBuffer;
+      const shaper = off.createWaveShaper();
+
+      const amt  = window.amt || 20;
+      const samples = 4096;
+      const curve = new Float32Array(samples);
+      for (let i = 0; i < samples; i++) {
+        const x = (i - samples / 2) / (samples / 2);
+        curve[i] = Math.tanh(x * amt);
+      }
+      shaper.curve = curve;
+      shaper.oversample = '4x';
+      src.connect(shaper).connect(off.destination);
+      src.start(0);
+      const rendered = await off.startRendering();
+      setStat('编码 ' + outExt.toUpperCase() + ' 中…', 0);
+
+      /* 2. 按选择格式编码 */
+      switch (outExt) {
+        case 'wav':
+          outBlob = bufToWav(rendered);
+          setStat('完成', 100);
+          break;
+        case 'mp3':
+          outBlob = await bufToMp3(rendered, p => setStat('编码 MP3…', p));
+          break;
+        case 'ogg':
+          setStat('OGG 未实现,自己转换', 0);
+          renderBtn.disabled = false;
+          return;
+      }
+
+      renderBtn.disabled = false;
+      downloadBtn.disabled = false;
+      player.src = URL.createObjectURL(outBlob);
+      player.style.display = 'block';
+      setStat('完成，可播放或下载', 100);
+    };
+
+    // 修改下载按钮功能，显示文件名修改弹窗
+    downloadBtn.onclick = () => {
+      if (!outBlob) return;
+      const defaultName = 'distorted.' + outExt;
+      showFilenameModal(defaultName);
+    };
+
+    // 执行下载功能
+    function performDownload(filename) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(outBlob);
+      a.download = filename;
+      a.click();
+    }
+  </script>
+</body>
+</html>
